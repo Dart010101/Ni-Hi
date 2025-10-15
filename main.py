@@ -386,20 +386,23 @@ def get_diff_mult(conn, front_code, difficulty):
 def calc_task_xp(task, conn):
     if task['status'] not in ['Done', 'Failed', 'Skipped']:
         return 0.0
-
+    
     c = conn.cursor()
     c.execute("SELECT base_xp FROM piece_types WHERE code=%s" if IS_CLOUD else "SELECT base_xp FROM piece_types WHERE code=?", (task['piece_type'],))
     row = c.fetchone()
-    base_xp = row[0] if row else (task['minutes'] // 10) * 10
-
+    base_xp = row['base_xp'] if IS_CLOUD and row else (row[0] if row else 10)
+    
+    # Множитель минут: каждые 10 минут = x1
+    minutes_mult = max(1, task['minutes'] / 10)
+    
     tier_mult = get_tier_mult(conn, task['front_code'], task['tier'])
     diff_mult = get_diff_mult(conn, task['front_code'], task['difficulty'])
-
-    total_xp = base_xp * tier_mult * diff_mult
-
+    
+    total_xp = base_xp * minutes_mult * tier_mult * diff_mult
+    
     if task['status'] in ['Failed', 'Skipped']:
         total_xp = -total_xp * 0.5
-
+    
     return round(total_xp, 1)
 
 def get_level(xp, conn):
